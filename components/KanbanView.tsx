@@ -22,6 +22,7 @@ const STAGE_COLORS: Record<LeadStage, string> = {
 const KanbanView: React.FC<KanbanViewProps> = ({ leads, updateLeadStage, users, onUpdateLead, onAddActivity }) => {
   const [draggedLeadId, setDraggedLeadId] = useState<number | null>(null);
   const [dragOverStage, setDragOverStage] = useState<LeadStage | null>(null);
+  const [justDroppedLeadId, setJustDroppedLeadId] = useState<number | null>(null);
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, leadId: number) => {
     e.dataTransfer.effectAllowed = 'move';
@@ -38,7 +39,9 @@ const KanbanView: React.FC<KanbanViewProps> = ({ leads, updateLeadStage, users, 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>, stage: LeadStage) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    setDragOverStage(stage);
+    if (dragOverStage !== stage) {
+      setDragOverStage(stage);
+    }
   };
   
   const handleDragLeave = () => {
@@ -50,6 +53,10 @@ const KanbanView: React.FC<KanbanViewProps> = ({ leads, updateLeadStage, users, 
     setDragOverStage(null);
     if (draggedLeadId !== null) {
       updateLeadStage(draggedLeadId, stage);
+      setJustDroppedLeadId(draggedLeadId);
+      setTimeout(() => {
+        setJustDroppedLeadId(null);
+      }, 1500);
     }
   };
 
@@ -66,7 +73,7 @@ const KanbanView: React.FC<KanbanViewProps> = ({ leads, updateLeadStage, users, 
           onDragOver={(e) => handleDragOver(e, stage)}
           onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(e, stage)}
-          className={`bg-gray-100 dark:bg-gray-800 rounded-lg p-3 transition-colors duration-200 min-h-[200px] ${dragOverStage === stage ? 'bg-blue-100 dark:bg-gray-900 ring-2 ring-blue-500 ring-dashed' : ''}`}
+          className={`bg-gray-100 dark:bg-gray-800 rounded-lg p-3 transition-all duration-300 min-h-[200px] ${dragOverStage === stage ? 'bg-blue-100 dark:bg-gray-900 scale-[1.02]' : ''}`}
         >
           <h3 className={`font-semibold text-gray-700 dark:text-gray-200 mb-3 p-2 border-t-4 ${STAGE_COLORS[stage]} rounded-t-sm`}>
             {stage} ({leadsByStage[stage].length})
@@ -79,6 +86,7 @@ const KanbanView: React.FC<KanbanViewProps> = ({ leads, updateLeadStage, users, 
                 onDragStart={(e) => handleDragStart(e, lead.id)}
                 onDragEnd={handleDragEnd}
                 isDragging={draggedLeadId === lead.id}
+                isJustDropped={justDroppedLeadId === lead.id}
                 users={users}
                 onUpdateLead={onUpdateLead}
                 onAddActivity={onAddActivity}

@@ -8,12 +8,13 @@ interface LeadCardProps {
   onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
   isDragging: boolean;
+  isJustDropped: boolean;
   users: User[];
   onUpdateLead: (lead: Lead) => void;
   onAddActivity: (leadId: number, activity: Omit<Activity, 'id' | 'timestamp'>) => void;
 }
 
-const LeadCard: React.FC<LeadCardProps> = ({ lead, onDragStart, onDragEnd, isDragging, users, onUpdateLead, onAddActivity }) => {
+const LeadCard: React.FC<LeadCardProps> = ({ lead, onDragStart, onDragEnd, isDragging, isJustDropped, users, onUpdateLead, onAddActivity }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
@@ -23,7 +24,13 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onDragStart, onDragEnd, isDra
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
         onClick={() => setIsModalOpen(true)}
-        className={`bg-white dark:bg-gray-700 rounded-md p-4 shadow-sm cursor-pointer border border-gray-200 dark:border-gray-600 hover:shadow-lg hover:border-blue-500 dark:hover:border-blue-500 transition-all ${isDragging ? 'opacity-50 ring-2 ring-blue-500 scale-105 shadow-xl' : ''}`}
+        className={`rounded-md p-4 shadow-sm cursor-pointer border border-gray-200 dark:border-gray-600 hover:shadow-lg hover:border-blue-500 dark:hover:border-blue-500 transition-all duration-300
+          ${isJustDropped
+            ? 'bg-green-100 dark:bg-green-800/30'
+            : 'bg-white dark:bg-gray-700'
+          }
+          ${isDragging && 'opacity-40 border-dashed border-blue-400 transform rotate-3'}`
+        }
       >
         <h4 className="font-semibold text-sm text-gray-800 dark:text-white">{lead.companyName}</h4>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{lead.contactPerson}</p>
