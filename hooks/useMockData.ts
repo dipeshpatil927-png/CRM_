@@ -1,10 +1,10 @@
-import { useState, useCallback, useEffect } from 'react';
+// FIX: Import React to bring React types like React.Dispatch and React.SetStateAction into scope.
+import React, { useState, useCallback } from 'react';
 import { User, Lead, LeadStage, Contact, EmailSequence, Integrations, Task, Activity, ActivityType, ActivityChannel } from '../types';
 
 const initialUsers: User[] = [
-  { id: 1, name: 'Alex Johnson', avatarUrl: `data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3crect width='100' height='100' rx='20' fill='%23f97316'/%3e%3ctext x='50' y='55' font-family='Arial' font-size='40' fill='white' text-anchor='middle'%3eAJ%3c/text%3e%3c/svg%3e` },
-  { id: 2, name: 'Maria Garcia', avatarUrl: `data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3crect width='100' height='100' rx='20' fill='%238b5cf6'/%3e%3ctext x='50' y='55' font-family='Arial' font-size='40' fill='white' text-anchor='middle'%3eMG%3c/text%3e%3c/svg%3e` },
-  { id: 3, name: 'James Smith', avatarUrl: `data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3crect width='100' height='100' rx='20' fill='%2322c55e'/%3e%3ctext x='50' y='55' font-family='Arial' font-size='40' fill='white' text-anchor='middle'%3eJS%3c/text%3e%3c/svg%3e` },
+  { id: 1, name: 'Dipesh Patil', email: 'dipesh.p@apex.com', avatarUrl: `data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3crect width='100' height='100' rx='20' fill='%233b82f6'/%3e%3ctext x='50' y='55' font-family='Arial' font-size='40' fill='white' text-anchor='middle'%3eDP%3c/text%3e%3c/svg%3e` },
+  { id: 2, name: 'Komal Agarwal', email: 'komal.a@apex.com', avatarUrl: `data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3crect width='100' height='100' rx='20' fill='%23a855f7'/%3e%3ctext x='50' y='55' font-family='Arial' font-size='40' fill='white' text-anchor='middle'%3eKA%3c/text%3e%3c/svg%3e` },
 ];
 
 const initialLeads: Lead[] = [
@@ -61,7 +61,7 @@ const initialLeads: Lead[] = [
     phone: '111-222-3333',
     stage: LeadStage.New,
     source: 'Cold Call',
-    assignedTo: initialUsers[2],
+    assignedTo: initialUsers[1],
     lastContacted: '2023-10-28',
     notes: 'New lead from the marketing campaign. Haven\'t been able to reach Susan yet. Left a voicemail. Will try again tomorrow morning.',
     value: 20000,
@@ -89,7 +89,7 @@ const initialLeads: Lead[] = [
     phone: '444-555-6666',
     stage: LeadStage.Lost,
     source: 'Website',
-    assignedTo: initialUsers[2],
+    assignedTo: initialUsers[0],
     lastContacted: '2023-10-10',
     notes: 'Lost to a competitor due to pricing. Their budget was too tight for our premium features. Will keep them on the mailing list for future offers.',
     value: 45000,
@@ -122,9 +122,12 @@ const initialTasks: Task[] = [
 
 const initialIntegrations: Integrations = { whatsapp: false, linkedin: false };
 
-export const useMockData = () => {
-    // Helper to get initial state from localStorage
-    const getInitialState = <T,>(key: string, defaultValue: T): T => {
+/**
+ * A custom hook for managing state that persists in localStorage.
+ * It synchronizes state changes to localStorage immediately.
+ */
+function usePersistentState<T>(key: string, defaultValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
+    const [state, setState] = useState<T>(() => {
         try {
             const storedValue = localStorage.getItem(key);
             if (storedValue) {
@@ -134,43 +137,41 @@ export const useMockData = () => {
             console.error(`Error parsing localStorage key "${key}":`, error);
         }
         return defaultValue;
-    };
+    });
 
-    const [leads, setLeads] = useState<Lead[]>(() => getInitialState('crm_leads', initialLeads));
-    const [contacts, setContacts] = useState<Contact[]>(() => getInitialState('crm_contacts', initialContacts));
-    const [emailSequences, setEmailSequences] = useState<EmailSequence[]>(() => getInitialState('crm_email_sequences', initialEmailSequences));
-    const [integrations, setIntegrations] = useState<Integrations>(() => getInitialState('crm_integrations', initialIntegrations));
-    const [tasks, setTasks] = useState<Task[]>(() => getInitialState('crm_tasks', initialTasks));
+    const setPersistentState = useCallback((value: React.SetStateAction<T>) => {
+        setState(currentState => {
+            const newState = typeof value === 'function' 
+                ? (value as (prevState: T) => T)(currentState) 
+                : value;
+            try {
+                localStorage.setItem(key, JSON.stringify(newState));
+            } catch (error) {
+                console.error(`Error saving to localStorage key "${key}":`, error);
+            }
+            return newState;
+        });
+    }, [key]);
+
+    return [state, setPersistentState];
+}
+
+
+export const useMockData = () => {
+    const [leads, setLeads] = usePersistentState<Lead[]>('crm_leads', initialLeads);
+    const [contacts, setContacts] = usePersistentState<Contact[]>('crm_contacts', initialContacts);
+    const [emailSequences, setEmailSequences] = usePersistentState<EmailSequence[]>('crm_email_sequences', initialEmailSequences);
+    const [integrations, setIntegrations] = usePersistentState<Integrations>('crm_integrations', initialIntegrations);
+    const [tasks, setTasks] = usePersistentState<Task[]>('crm_tasks', initialTasks);
     const users = initialUsers;
-
-    // Effects to save state to localStorage whenever it changes
-    useEffect(() => {
-        localStorage.setItem('crm_leads', JSON.stringify(leads));
-    }, [leads]);
-
-    useEffect(() => {
-        localStorage.setItem('crm_contacts', JSON.stringify(contacts));
-    }, [contacts]);
-
-    useEffect(() => {
-        localStorage.setItem('crm_email_sequences', JSON.stringify(emailSequences));
-    }, [emailSequences]);
-
-    useEffect(() => {
-        localStorage.setItem('crm_integrations', JSON.stringify(integrations));
-    }, [integrations]);
-
-    useEffect(() => {
-        localStorage.setItem('crm_tasks', JSON.stringify(tasks));
-    }, [tasks]);
 
     const updateLeadStage = useCallback((leadId: number, newStage: LeadStage) => {
       setLeads(prevLeads =>
         prevLeads.map(lead =>
-          lead.id === leadId ? { ...lead, stage: newStage } : lead
+          (lead.id === leadId && lead.stage !== newStage) ? { ...lead, stage: newStage } : lead
         )
       );
-    }, []);
+    }, [setLeads]);
 
     const updateLead = useCallback((updatedLead: Lead) => {
         setLeads(prevLeads =>
@@ -178,7 +179,7 @@ export const useMockData = () => {
                 lead.id === updatedLead.id ? updatedLead : lead
             )
         );
-    }, []);
+    }, [setLeads]);
 
     const addLead = useCallback((newLeadData: Omit<Lead, 'id' | 'assignedTo' | 'lastContacted' | 'activities'> & { assignedToId: number }) => {
         setLeads(prevLeads => {
@@ -193,11 +194,11 @@ export const useMockData = () => {
             };
             return [newLead, ...prevLeads];
         });
-    }, [users]);
+    }, [users, setLeads]);
 
     const deleteLeads = useCallback((leadIds: number[]) => {
         setLeads(prevLeads => prevLeads.filter(lead => !leadIds.includes(lead.id)));
-    }, []);
+    }, [setLeads]);
 
     const addContact = useCallback((newContactData: Omit<Contact, 'id'>) => {
         setContacts(prevContacts => {
@@ -205,30 +206,30 @@ export const useMockData = () => {
             const newContact: Contact = { ...newContactData, id: newId };
             return [newContact, ...prevContacts];
         });
-    }, []);
+    }, [setContacts]);
 
     const updateSequence = useCallback((sequence: EmailSequence) => {
         setEmailSequences(prev => prev.map(s => s.id === sequence.id ? sequence : s));
-    }, []);
+    }, [setEmailSequences]);
 
     const toggleIntegration = useCallback((integrationName: keyof Integrations) => {
         setIntegrations(prev => ({ ...prev, [integrationName]: !prev[integrationName] }));
-    }, []);
+    }, [setIntegrations]);
     
     const addTask = useCallback((text: string) => {
       setTasks(prev => {
         const newId = prev.length > 0 ? Math.max(...prev.map(t => t.id)) + 1 : 1;
         return [...prev, {id: newId, text, completed: false}];
       });
-    }, []);
+    }, [setTasks]);
 
     const toggleTask = useCallback((id: number) => {
       setTasks(prev => prev.map(t => t.id === id ? {...t, completed: !t.completed} : t));
-    }, []);
+    }, [setTasks]);
     
     const deleteTask = useCallback((id: number) => {
       setTasks(prev => prev.filter(t => t.id !== id));
-    }, []);
+    }, [setTasks]);
 
     const addLeadActivity = useCallback((leadId: number, activity: Omit<Activity, 'id' | 'timestamp'>) => {
         setLeads(prevLeads => 
@@ -248,7 +249,7 @@ export const useMockData = () => {
                 return lead;
             })
         );
-    }, []);
+    }, [setLeads]);
     
     const toggleActivityCompletion = useCallback((leadId: number, activityId: number) => {
         setLeads(prevLeads =>
@@ -267,7 +268,35 @@ export const useMockData = () => {
                 return lead;
             })
         );
-    }, []);
+    }, [setLeads]);
+    
+    const updateLeadsStage = useCallback((leadIds: number[], newStage: LeadStage) => {
+        setLeads(prevLeads =>
+            prevLeads.map(lead =>
+                leadIds.includes(lead.id) ? { ...lead, stage: newStage } : lead
+            )
+        );
+    }, [setLeads]);
+
+    const addActivityToLeads = useCallback((leadIds: number[], activity: Omit<Activity, 'id' | 'timestamp'>) => {
+        setLeads(prevLeads =>
+            prevLeads.map(lead => {
+                if (leadIds.includes(lead.id)) {
+                    const newActivity: Activity = {
+                        ...activity,
+                        id: Date.now() + Math.random(), // Add random to avoid collisions in a loop
+                        timestamp: new Date().toISOString(),
+                        completed: false,
+                    };
+                    return {
+                        ...lead,
+                        activities: [newActivity, ...lead.activities],
+                    };
+                }
+                return lead;
+            })
+        );
+    }, [setLeads]);
 
     return { 
         users, 
@@ -288,5 +317,7 @@ export const useMockData = () => {
         updateLead,
         addLeadActivity,
         toggleActivityCompletion,
+        updateLeadsStage,
+        addActivityToLeads,
     };
 };

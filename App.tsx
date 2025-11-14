@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Icon } from './components/icons';
 import Dashboard from './components/Dashboard';
 import LeadsPage from './components/LeadsPage';
@@ -8,13 +8,17 @@ import TasksPage from './components/TasksPage';
 import ReportsPage from './components/ReportsPage';
 import SettingsPage from './components/SettingsPage';
 import ActivitiesPage from './components/ActivitiesPage';
+import LoginPage from './components/LoginPage';
 import { useMockData } from './hooks/useMockData';
 import { Lead, Contact, EmailSequence, User, Activity } from './types';
 
 const App: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const [activeView, setActiveView] = useState('Dashboard');
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
   const { 
     leads, 
     users, 
@@ -34,7 +38,19 @@ const App: React.FC = () => {
     updateLead,
     addLeadActivity,
     toggleActivityCompletion,
+    updateLeadsStage,
+    addActivityToLeads,
   } = useMockData();
+
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const item = window.sessionStorage.getItem('currentUser');
+      return item ? JSON.parse(item) : null;
+    } catch (error) {
+      console.error("Error parsing user from session storage", error);
+      return null;
+    }
+  });
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -44,6 +60,33 @@ const App: React.FC = () => {
     }
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+   useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleLogin = useCallback((email: string): User | null => {
+      const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+      if (user) {
+          window.sessionStorage.setItem('currentUser', JSON.stringify(user));
+          setCurrentUser(user);
+          return user;
+      }
+      return null;
+  }, [users]);
+
+  const handleLogout = useCallback(() => {
+      window.sessionStorage.removeItem('currentUser');
+      setCurrentUser(null);
+      setIsProfileMenuOpen(false);
+  }, []);
+
 
   const toggleTheme = () => {
     setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
@@ -70,9 +113,10 @@ const App: React.FC = () => {
 
 
   const renderContent = () => {
+    if (!currentUser) return null;
     switch(activeView) {
       case 'Dashboard':
-        return <Dashboard leads={leads} users={users} onUpdateLead={updateLead} onAddActivity={addLeadActivity} />;
+        return <Dashboard leads={leads} users={users} onUpdateLead={updateLead} onAddActivity={addLeadActivity} currentUser={currentUser} />;
       case 'Leads':
         return <LeadsPage 
                   leads={leads} 
@@ -84,6 +128,8 @@ const App: React.FC = () => {
                   onUpdateLead={updateLead}
                   setActiveView={setActiveView}
                   onAddActivity={addLeadActivity}
+                  updateLeadsStage={updateLeadsStage}
+                  addActivityToLeads={addActivityToLeads}
                 />;
       case 'Contacts':
         return <ContactsPage contacts={contacts} addContact={addContact} />;
@@ -98,8 +144,12 @@ const App: React.FC = () => {
       case 'Activities':
         return <ActivitiesPage leads={leads} onToggleActivity={toggleActivityCompletion} />;
       default:
-        return <Dashboard leads={leads} users={users} onUpdateLead={updateLead} onAddActivity={addLeadActivity} />;
+        return <Dashboard leads={leads} users={users} onUpdateLead={updateLead} onAddActivity={addLeadActivity} currentUser={currentUser} />;
     }
+  }
+
+  if (!currentUser) {
+    return <LoginPage onLogin={handleLogin} theme={theme} toggleTheme={toggleTheme} />;
   }
 
   return (
@@ -143,13 +193,32 @@ const App: React.FC = () => {
             <button onClick={toggleTheme} className="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700" aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
                 <Icon name={theme === 'light' ? 'Moon' : 'Sun'} className="w-6 h-6"/>
             </button>
-            <div className="relative">
-              <img
-                src={`data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3ccircle cx='50' cy='50' r='50' fill='%2360a5fa'/%3e%3c/svg%3e`}
-                alt="User Avatar"
-                className="w-10 h-10 rounded-full"
-              />
-              <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-white dark:border-gray-800"></span>
+            <div className="relative" ref={profileMenuRef}>
+              <button onClick={() => setIsProfileMenuOpen(prev => !prev)} className="flex items-center space-x-2">
+                <img
+                  src={currentUser.avatarUrl}
+                  alt="User Avatar"
+                  className="w-10 h-10 rounded-full"
+                />
+                <span className="hidden md:inline text-sm font-medium text-gray-700 dark:text-gray-200">{currentUser.name}</span>
+                <Icon name="ChevronDown" className="w-4 h-4 text-gray-500" />
+              </button>
+              {isProfileMenuOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-20 border border-gray-200 dark:border-gray-700">
+                  <div className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                    <div className="font-medium">{currentUser.name}</div>
+                    <div className="truncate text-gray-500 dark:text-gray-400">{currentUser.email}</div>
+                  </div>
+                  <div className="border-t border-gray-200 dark:border-gray-700"></div>
+                  <button 
+                    onClick={handleLogout} 
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+                  >
+                    <Icon name="LogOut" className="w-4 h-4 mr-2" />
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>

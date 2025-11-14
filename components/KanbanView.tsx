@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Lead, LeadStage, User, Activity } from '../types';
 import LeadCard from './LeadCard';
@@ -26,6 +25,7 @@ const KanbanView: React.FC<KanbanViewProps> = ({ leads, updateLeadStage, users, 
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, leadId: number) => {
     e.dataTransfer.effectAllowed = 'move';
+    // This is necessary for Firefox to initiate the drag
     e.dataTransfer.setData('text/plain', leadId.toString());
     setDraggedLeadId(leadId);
   };
@@ -47,16 +47,10 @@ const KanbanView: React.FC<KanbanViewProps> = ({ leads, updateLeadStage, users, 
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, stage: LeadStage) => {
     e.preventDefault();
-    const leadIdStr = e.dataTransfer.getData('text/plain');
-    if (!leadIdStr) {
-      setDragOverStage(null);
-      return;
-    }
-    const leadId = parseInt(leadIdStr, 10);
-    if (leadId) {
-      updateLeadStage(leadId, stage);
-    }
     setDragOverStage(null);
+    if (draggedLeadId !== null) {
+      updateLeadStage(draggedLeadId, stage);
+    }
   };
 
   const leadsByStage = Object.values(LeadStage).reduce((acc, stage) => {

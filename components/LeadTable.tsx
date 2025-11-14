@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Lead, LeadStage, User, Activity } from '../types';
 import LeadDetailModal from './LeadDetailModal';
@@ -25,17 +24,40 @@ interface LeadTableProps {
 const LeadTable: React.FC<LeadTableProps> = ({ leads, selectedLeads, setSelectedLeads, users, onUpdateLead, onAddActivity }) => {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [filter, setFilter] = useState('');
+  const [stageFilter, setStageFilter] = useState<LeadStage | 'all'>('all');
+  const [userFilter, setUserFilter] = useState<number | 'all'>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
   const [sortConfig, setSortConfig] = useState<{ key: keyof Lead | null; direction: 'ascending' | 'descending' }>({
     key: 'lastContacted',
     direction: 'descending',
   });
 
   const sortedAndFilteredLeads = useMemo(() => {
-    let filteredLeads = leads.filter(lead =>
-      lead.companyName.toLowerCase().includes(filter.toLowerCase()) ||
-      lead.contactPerson.toLowerCase().includes(filter.toLowerCase()) ||
-      lead.email.toLowerCase().includes(filter.toLowerCase())
-    );
+    let filteredLeads = leads
+      .filter(lead =>
+        lead.companyName.toLowerCase().includes(filter.toLowerCase()) ||
+        lead.contactPerson.toLowerCase().includes(filter.toLowerCase()) ||
+        lead.email.toLowerCase().includes(filter.toLowerCase())
+      )
+      .filter(lead => stageFilter === 'all' || lead.stage === stageFilter)
+      .filter(lead => userFilter === 'all' || lead.assignedTo.id === userFilter)
+      .filter(lead => {
+          if (!startDate && !endDate) return true;
+          try {
+            const leadDate = new Date(lead.lastContacted);
+            if (startDate && leadDate < new Date(startDate)) return false;
+            if (endDate) {
+                const endOfDay = new Date(endDate);
+                endOfDay.setHours(23, 59, 59, 999);
+                if (leadDate > endOfDay) return false;
+            }
+            return true;
+          } catch(e) {
+              return true; // if date is invalid, don't filter it out
+          }
+      });
 
     if (sortConfig.key) {
       filteredLeads.sort((a, b) => {
@@ -50,7 +72,7 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads, selectedLeads, setSelected
     }
 
     return filteredLeads;
-  }, [leads, filter, sortConfig]);
+  }, [leads, filter, sortConfig, stageFilter, userFilter, startDate, endDate]);
 
   const requestSort = (key: keyof Lead) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -98,17 +120,42 @@ const LeadTable: React.FC<LeadTableProps> = ({ leads, selectedLeads, setSelected
   }, [leads, setSelectedLeads]);
 
   const isAllSelected = !!selectedLeads && sortedAndFilteredLeads.length > 0 && selectedLeads.size === sortedAndFilteredLeads.length;
+  
+  const resetFilters = () => {
+    setFilter('');
+    setStageFilter('all');
+    setUserFilter('all');
+    setStartDate('');
+    setEndDate('');
+  };
 
   return (
     <div>
-      <div className="mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
         <input
           type="text"
           placeholder="Search leads..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="w-full p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          className="lg:col-span-2 w-full p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
         />
+        <select value={stageFilter} onChange={e => setStageFilter(e.target.value as LeadStage | 'all')} className="w-full p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+            <option value="all">All Stages</option>
+            {Object.values(LeadStage).map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={userFilter} onChange={e => setUserFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))} className="w-full p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+            <option value="all">All Users</option>
+            {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+        </select>
+         <button onClick={resetFilters} className="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-sm rounded-md hover:bg-gray-300 dark:hover:bg-gray-500">Reset</button>
+        <div className="lg:col-span-2">
+            <label className="text-sm text-gray-500 dark:text-gray-400">Last Contacted:</label>
+            <div className="flex items-center space-x-2">
+                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                 <span className="text-gray-500 dark:text-gray-400">to</span>
+                 <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+            </div>
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
